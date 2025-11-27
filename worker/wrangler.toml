@@ -1,0 +1,19 @@
+name = "discord-bot-api"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "r3v"
+database_id = "646c13f4-c0ce-4c9c-9289-3454bacc52b3"
+
+# Environment variables
+[vars]
+# API Key for bot authentication
+API_KEY = "pB67PnCUxqXTwFY8R5yfGeovCVgXVb3I"
+
+# Set your Eve SSO configuration here (can be updated without wrangler secrets)
+EVE_CLIENT_ID = "bfad173c2d244e4d9a3b2b9a834f33ac"
+EVE_CLIENT_SECRET = "eat_W6IsTzxRII6WywqMcfGxSgoFiPAKVxR7_3zPYGw"
+EVE_CALLBACK_URL = "https://your-domain.com/auth/callback"

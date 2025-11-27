@@ -1,0 +1,39 @@
+Potential Improvements:
+
+1. Persistent Reminders (Database)
+Currently reminders are lost if the bot restarts. Use SQLite or PostgreSQL to store them. - Need to look at Cloudflare database options.
+
+2. Environment Variable Validation
+No error handling if .env variables are missing or invalid - bot will crash on startup.
+
+3. Fetch Archived Threads
+Duplicate check only looks at active threads - users can create new threads if old ones are archived.
+
+4. Rate Limit Handling
+Adding many users to a thread could hit Discord's rate limits without proper handling.
+
+5. Logging Improvements
+ console timestamps
+ log levels (info/warning/error)
+ file logging for debugging
+
+6. Better Thread Management
+No way to list all open threads
+No auto-close for inactive threads
+No /reopen command
+
+7. User Feedback
+No confirmation when thread is created successfully (just ephemeral message that disappears).
+
+8. Security
+Token is loaded but not validated
+No checks if bot has required permissions before attempting operations
+9. Code Organization
+All code in one file - would benefit from separating commands, utilities, and config.
+
+10. Better Error Messages
+Generic error messages don't help users understand what went wrong.
+
+11. /close - supposed to close thread, but error in terminal and Discord, stating: Failed to Recieve Message, nothing existings. - Needs to remove everyone from thread that do not have the Recruiter or Director roles within Discord.
+
+12. /remind - Command runs, but nothing happens.

@@ -1,0 +1,22 @@
+{
+  "name": "discord-bot-api",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker API for Discord Bot with D1 Database",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "init-db": "wrangler d1 execute r3v --remote --file=./schema.sql"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "d1",
+    "discord"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "wrangler": "^4.51.0"
+  }
+}
