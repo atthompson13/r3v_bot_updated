@@ -68,6 +68,13 @@ export default {
       } else if (path.startsWith('/auth/') && request.method === 'DELETE') {
         const discordId = path.split('/')[2];
         return await deleteAuthUser(discordId, env, corsHeaders);
+      } else if (path === '/logs' && request.method === 'POST') {
+        return await createLog(request, env, corsHeaders);
+      } else if (path.startsWith('/logs/guild/') && request.method === 'GET') {
+        const guildId = path.split('/')[3];
+        const limit = url.searchParams.get('limit') || '100';
+        const level = url.searchParams.get('level') || null;
+        return await getGuildLogs(guildId, limit, level, env, corsHeaders);
       } else {
         return new Response(JSON.stringify({ error: 'Not found' }), {
           status: 404,
@@ -537,3 +544,49 @@ async function deleteAuthUser(discordId, env, corsHeaders) {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
 }
+
+// Create log entry
+async function createLog(request, env, corsHeaders) {
+  const { guild_id, level, message, user_name } = await request.json();
+  
+  if (!guild_id || !level || !message) {
+    return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const created_at = Math.floor(Date.now() / 1000);
+
+  await env.DB.prepare(
+    'INSERT INTO logs (guild_id, level, message, user_name, created_at) VALUES (?, ?, ?, ?, ?)'
+  ).bind(guild_id, level, message, user_name || null, created_at).run();
+
+  return new Response(JSON.stringify({ message: 'Log created' }), {
+    status: 201,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+// Get guild logs
+async function getGuildLogs(guildId, limit, level, env, corsHeaders) {
+  let query = 'SELECT * FROM logs WHERE guild_id = ?';
+  const params = [guildId];
+  
+  if (level) {
+    query += ' AND level = ?';
+    params.push(level);
+  }
+  
+  query += ' ORDER BY created_at DESC LIMIT ?';
+  params.push(parseInt(limit));
+
+  const stmt = env.DB.prepare(query);
+  const { results } = await stmt.bind(...params).all();
+
+  return new Response(JSON.stringify(results), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+

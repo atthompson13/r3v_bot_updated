@@ -168,17 +168,41 @@ async def delete_auth_user(discord_id: str):
     """Delete authenticated user"""
     return await api_request('DELETE', f'/auth/{discord_id}')
 
+async def create_log(guild_id: int, level: str, message: str, user_name: str = None):
+    """Create log entry in D1 database"""
+    data = {
+        'guild_id': str(guild_id),
+        'level': level,
+        'message': message,
+        'user_name': user_name
+    }
+    return await api_request('POST', '/logs', data)
+
+async def get_guild_logs(guild_id: int, limit: int = 100, level: str = None):
+    """Get logs from D1 database"""
+    params = f'?limit={limit}'
+    if level:
+        params += f'&level={level}'
+    result = await api_request('GET', f'/logs/guild/{guild_id}{params}')
+    return result if result else []
+
 # ----------------------------
 # Utility: Logging
 # ----------------------------
 async def log_action(guild: discord.Guild, message: str, level: str = "INFO"):
-    """Log actions with timestamp and level to bot-logs channel"""
+    """Log actions with timestamp and level to bot-logs channel and D1 database"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     emoji = {"INFO": "📝", "WARNING": "⚠️", "ERROR": "❌"}.get(level, "📝")
     
-    # File and console logging
+    # Console logging
     log_level = getattr(logging, level, logging.INFO)
     logger.log(log_level, message)
+    
+    # D1 Database logging
+    try:
+        await create_log(guild.id, level, message)
+    except Exception as e:
+        logger.error(f"Failed to save log to database: {e}")
     
     # Channel logging
     log_channel = bot.get_channel(BOT_LOGS_CHANNEL_ID)
@@ -808,11 +832,19 @@ async def reopen(interaction: discord.Interaction, thread_name: str):
 # ----------------------------
 @bot.tree.command(
     name="list-reminders",
-    description="List your pending reminders.",
+    description="List pending reminders. (Recruiters and Directors only)",
     guild=discord.Object(id=GUILD_ID)
 )
 async def list_reminders(interaction: discord.Interaction):
-    # Directors can see all reminders, others see only their own
+    # Check if user has recruiter or director role
+    has_permission = any(role.id in [RECRUITER_ROLE_ID, DIRECTOR_ROLE_ID] for role in interaction.user.roles)
+    if not has_permission:
+        await interaction.response.send_message(
+            "❌ You don't have permission to use this command.", ephemeral=True
+        )
+        return
+    
+    # Directors can see all reminders, recruiters see only their own
     is_director = any(role.id == DIRECTOR_ROLE_ID for role in interaction.user.roles)
     
     if is_director:
@@ -880,11 +912,19 @@ async def list_reminders(interaction: discord.Interaction):
 # ----------------------------
 @bot.tree.command(
     name="cancel-reminder",
-    description="Cancel a pending reminder.",
+    description="Cancel a pending reminder. (Recruiters and Directors only)",
     guild=discord.Object(id=GUILD_ID)
 )
 @app_commands.describe(reminder_id="The ID of the reminder to cancel")
 async def cancel_reminder(interaction: discord.Interaction, reminder_id: int):
+    # Check if user has recruiter or director role
+    has_permission = any(role.id in [RECRUITER_ROLE_ID, DIRECTOR_ROLE_ID] for role in interaction.user.roles)
+    if not has_permission:
+        await interaction.response.send_message(
+            "❌ You don't have permission to use this command.", ephemeral=True
+        )
+        return
+    
     is_director = any(role.id == DIRECTOR_ROLE_ID for role in interaction.user.roles)
     
     # Get reminder to check ownership
@@ -933,10 +973,18 @@ async def cancel_reminder(interaction: discord.Interaction, reminder_id: int):
 # ----------------------------
 @bot.tree.command(
     name="auth",
-    description="Authenticate with Eve Online SSO to update your Discord nickname.",
+    description="Authenticate with Eve Online SSO. (Recruiters and Directors only)",
     guild=discord.Object(id=GUILD_ID)
 )
 async def auth(interaction: discord.Interaction):
+    # Check if user has recruiter or director role
+    has_permission = any(role.id in [RECRUITER_ROLE_ID, DIRECTOR_ROLE_ID] for role in interaction.user.roles)
+    if not has_permission:
+        await interaction.response.send_message(
+            "❌ You don't have permission to use this command.", ephemeral=True
+        )
+        return
+    
     try:
         # Create auth URL
         auth_url = await create_auth_url(interaction.user.id, interaction.user.name)
@@ -1075,6 +1123,70 @@ async def status(interaction: discord.Interaction):
     except Exception as e:
         await interaction.followup.send(f"❌ Error retrieving status: {str(e)}", ephemeral=True)
         logger.error(f"Error in /status command: {e}")
+
+# ----------------------------
+# /logs Command (Directors only)
+# ----------------------------
+@bot.tree.command(
+    name="logs",
+    description="Retrieve bot logs from database. (Directors only)",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    limit="Number of logs to retrieve (default: 50, max: 100)",
+    level="Filter by log level (INFO, WARNING, ERROR)"
+)
+async def logs_command(interaction: discord.Interaction, limit: int = 50, level: str = None):
+    # Check if user has director role
+    if not any(role.id == DIRECTOR_ROLE_ID for role in interaction.user.roles):
+        await interaction.response.send_message(
+            "❌ You don't have permission to use this command.", ephemeral=True
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+    
+    try:
+        # Validate limit
+        if limit < 1 or limit > 100:
+            limit = 50
+        
+        # Validate level
+        if level and level.upper() not in ['INFO', 'WARNING', 'ERROR']:
+            await interaction.followup.send("❌ Invalid level. Use INFO, WARNING, or ERROR.", ephemeral=True)
+            return
+        
+        # Get logs from database
+        logs = await get_guild_logs(interaction.guild.id, limit, level.upper() if level else None)
+        
+        if not logs:
+            await interaction.followup.send("📭 No logs found.", ephemeral=True)
+            return
+        
+        # Build embed
+        emoji_map = {"INFO": "📝", "WARNING": "⚠️", "ERROR": "❌"}
+        
+        embed = discord.Embed(
+            title=f"📋 Bot Logs{f' ({level.upper()})' if level else ''}",
+            color=discord.Color.blue(),
+            timestamp=datetime.now()
+        )
+        
+        log_text = []
+        for log in logs[:25]:  # Show max 25 in embed
+            timestamp = datetime.fromtimestamp(log['created_at']).strftime("%m/%d %H:%M:%S")
+            emoji = emoji_map.get(log['level'], "📝")
+            msg = log['message'][:80]  # Truncate long messages
+            log_text.append(f"{emoji} `{timestamp}` {msg}")
+        
+        embed.description = "\n".join(log_text)
+        embed.set_footer(text=f"Showing {len(logs[:25])} of {len(logs)} logs • Requested by {interaction.user.name}")
+        
+        await interaction.followup.send(embed=embed, ephemeral=True)
+        
+    except Exception as e:
+        await interaction.followup.send(f"❌ Error retrieving logs: {str(e)}", ephemeral=True)
+        logger.error(f"Error in /logs command: {e}")
 
 # ----------------------------
 # Error Handler

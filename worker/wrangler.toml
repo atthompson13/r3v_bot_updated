@@ -5,8 +5,8 @@ compatibility_date = "2024-11-01"
 # D1 Database binding
 [[d1_databases]]
 binding = "DB"
-database_name = "r3v"
-database_id = "database id"
+database_name = "database_name"
+database_id = "database_id"
 
 # Environment variables
 [vars]

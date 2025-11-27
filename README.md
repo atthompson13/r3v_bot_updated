@@ -7,19 +7,20 @@ A comprehensive Discord bot for managing recruitment threads, reminders, and Eve
 ### Thread Management
 - **`/recruit`** - Create a new recruitment thread (available to everyone, pings @recruiter role)
 - **`/officer`** - Elevate a thread to officer discussion (Recruiter or Director role required, pings @officer role)
-- **`/close`** - Archive a thread and remove all non-staff users (Recruiter role required)
+- **`/close`** - Archive a thread and remove all non-staff users (Director role required)
 - **`/remove`** - Remove a user from the current thread (Recruiter or Director role required)
-- **`/threads`** - List all active recruitment and officer threads
-- **`/reopen`** - Reopen an archived thread
+- **`/threads`** - List all active recruitment and officer threads (Recruiter or Director role required)
+- **`/reopen`** - Reopen an archived thread (Director role required)
 
 ### Reminders
-- **`/remind`** - Set a reminder in the current thread (minutes, hours, or days)
-- **`/list-reminders`** - View all your active reminders
-- **`/cancel-reminder`** - Cancel a specific reminder by ID
+- **`/remind`** - Set a reminder in the current thread (Director role required)
+- **`/list-reminders`** - View pending reminders (Recruiter or Director role required)
+- **`/cancel-reminder`** - Cancel a specific reminder by ID (Recruiter or Director role required)
 
 ### Eve Online Integration
-- **`/auth`** - Get SSO link to authenticate with Eve Online
-- **`/status`** - View authenticated characters and their corporation/alliance info
+- **`/auth`** - Get SSO link to authenticate with Eve Online (Recruiter or Director role required)
+- **`/status`** - View authenticated characters and their corporation/alliance info (Director role required)
+- **`/logs`** - Retrieve bot logs from D1 database (Director role required)
 - Automatic nickname updates based on Eve character data (every 10 minutes)
 - List of unauthenticated users for compliance tracking
 
@@ -70,6 +71,18 @@ authenticated_users (
   expires_at INTEGER NOT NULL,
   created_at INTEGER DEFAULT (unixepoch()),
   updated_at INTEGER DEFAULT (unixepoch())
+)
+```
+
+#### Logs Table
+```sql
+logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  level TEXT NOT NULL,
+  message TEXT NOT NULL,
+  user_name TEXT,
+  created_at INTEGER NOT NULL
 )
 ```
 
@@ -129,6 +142,7 @@ Deploy schemas:
 ```bash
 wrangler d1 execute r3v --remote --file=./schema.sql
 wrangler d1 execute r3v --remote --file=./schema-auth.sql
+wrangler d1 execute r3v --remote --file=./schema-logs.sql
 ```
 
 ### 4. Deploy Worker
@@ -181,14 +195,17 @@ Bot Intents Required:
 
 ## Logging
 
-Logs are stored in two locations:
-1. **File**: `logs/bot.log` (rotating, max 5MB, 5 backups)
-2. **Discord**: Channel specified by `LOG_CHANNEL_ID`
+Logs are stored in three locations:
+1. **Console**: Real-time output for monitoring
+2. **D1 Database**: Persistent storage in the `logs` table, queryable via `/logs` command
+3. **Discord**: Channel specified by `LOG_CHANNEL_ID` for real-time visibility
 
 Log levels:
 - `INFO` 📝 - General operations
 - `WARNING` ⚠️ - Non-critical issues
 - `ERROR` ❌ - Critical failures
+
+Use the `/logs` command to retrieve historical logs from the database (up to 100 entries).
 
 ## Maintenance
 
