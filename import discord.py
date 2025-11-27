@@ -357,7 +357,7 @@ async def on_member_join(member):
 # ----------------------------
 @bot.tree.command(
     name="recruit",
-    description="Open a private recruitment thread.",
+    description="Open a private recruitment thread (available to everyone).",
     guild=discord.Object(id=GUILD_ID)
 )
 @app_commands.checks.cooldown(1, 300.0, key=lambda i: i.user.id)
@@ -412,13 +412,11 @@ async def recruit(interaction: discord.Interaction):
                     await asyncio.sleep(0.5)  # Rate limit: 500ms delay between additions
                 except discord.HTTPException as e:
                     await log_action(guild, f"Failed to add {member.name} to thread: {e}", "WARNING")
-            ping_text = recruiter_role.mention
         else:
-            ping_text = ""
             await log_action(guild, "Recruiter role not found", "WARNING")
         
         welcome_message = (
-            f"{ping_text}\n"
+            f"{recruiter_role.mention if recruiter_role else ''}\n"
             f"👋 {interaction.user.mention} has started a recruitment thread!\n\n"
             "We're glad you're interested in joining us! To get started, auth all your characters that "
             "you're going to recruit into the corporation with our alliance here: "
@@ -440,13 +438,24 @@ async def recruit(interaction: discord.Interaction):
 # ----------------------------
 @bot.tree.command(
     name="officer",
-    description="Open a private thread for officer discussion.",
+    description="Open a private thread for officer discussion (or escalate from recruiter).",
     guild=discord.Object(id=GUILD_ID)
 )
 @app_commands.checks.cooldown(1, 600.0, key=lambda i: i.user.id)
 async def officer(interaction: discord.Interaction):
     guild = interaction.guild
     channel = interaction.channel
+    
+    # Check if user has Recruiter or Director role
+    recruiter_role = guild.get_role(RECRUITER_ROLE_ID)
+    director_role = guild.get_role(DIRECTOR_ROLE_ID)
+    
+    if not (recruiter_role in interaction.user.roles or director_role in interaction.user.roles):
+        await interaction.response.send_message(
+            "❌ You need the Recruiter or Director role to use this command.", ephemeral=True
+        )
+        return
+    
     thread_name = f"officer-{interaction.user.name}"
 
     # Prevent duplicate threads (case-insensitive) - check both active and archived
@@ -493,13 +502,11 @@ async def officer(interaction: discord.Interaction):
                     await asyncio.sleep(0.5)  # Rate limit: 500ms delay between additions
                 except discord.HTTPException as e:
                     await log_action(guild, f"Failed to add {member.name} to thread: {e}", "WARNING")
-            ping_text = director_role.mention
         else:
-            ping_text = ""
             await log_action(guild, "Director role not found", "WARNING")
 
         welcome_message = (
-            f"{ping_text}\n"
+            f"{director_role.mention if director_role else ''}\n"
             f"👋 {interaction.user.mention} has started a thread for officer discussion."
         )
 

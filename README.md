@@ -5,8 +5,8 @@ A comprehensive Discord bot for managing recruitment threads, reminders, and Eve
 ## Features
 
 ### Thread Management
-- **`/recruit`** - Create a new recruitment thread with applicant (Recruiter role required)
-- **`/officer`** - Elevate a recruitment thread to officer discussion (Director role required)
+- **`/recruit`** - Create a new recruitment thread (available to everyone, pings @recruiter role)
+- **`/officer`** - Elevate a thread to officer discussion (Recruiter or Director role required, pings @officer role)
 - **`/close`** - Archive a thread and remove all non-staff users (Recruiter role required)
 - **`/remove`** - Remove a user from the current thread (Recruiter or Director role required)
 - **`/threads`** - List all active recruitment and officer threads
